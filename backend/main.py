@@ -1,12 +1,17 @@
 import os
-import google.generativeai as genai
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from openai import AsyncOpenAI
 
 GOOGLE_API_KEY = "AIzaSyClpxKgMkrDo0RgkkVnh-6Dbi-ZWUapdZA"
-genai.configure(api_key=GOOGLE_API_KEY)
+
+# OpenAI 호환 모드를 사용하여 Gemini API 연결
+client = AsyncOpenAI(
+    api_key=GOOGLE_API_KEY,
+    base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+)
 
 app = FastAPI()
 
@@ -23,22 +28,29 @@ class ChatRequest(BaseModel):
 
 async def get_gemini_response(user_input: str):
     try:
-        model = genai.GenerativeModel('models/gemini-3.1-pro-preview')
-
-        prompt = (
-            f"{user_input}\n\n"
-            "---\n"
-            "System Instruction: You MUST think step-by-step before answering. "
-            "Enclose your complete thinking process inside <think> and </think> tags. "
-            "After closing the </think> tag, provide your final answer to the user in a clear and friendly manner. "
-            "Do not include any <think> tags in your final answer."
+        # OpenAI 라이브러리의 Chat Completions API 포맷 사용
+        response = await client.chat.completions.create(
+            model="gemini-1.5-pro", # 현재 호환성이 보장되는 모델로 임의 변경 (원하시는 모델명으로 수정 가능)
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You MUST think step-by-step before answering. "
+                        "Enclose your complete thinking process inside <think> and </think> tags. "
+                        "After closing the </think> tag, provide your final answer to the user in a clear and friendly manner. "
+                        "Do not include any <think> tags in your final answer."
+                    )
+                },
+                {"role": "user", "content": user_input}
+            ],
+            stream=True,
         )
 
-        response = await model.generate_content_async(prompt, stream=True)
-
         async for chunk in response:
-            if chunk.text:
-                yield chunk.text
+            content = chunk.choices[0].delta.content
+            if content:
+                yield content
+                
     except Exception as e:
         yield f"Error: {str(e)}"
 
