@@ -1,0 +1,14 @@
+my-llm-app/
+├── backend/
+│   └── main.py          # FastAPI 서버
+└── frontend/
+    ├── src/
+    │   ├── App.js       # React 메인 로직
+    │   └── App.css      # 간단한 스타일링
+    └── ...
+
+
+
+
+# frontend
+npx create-react-app frontend
