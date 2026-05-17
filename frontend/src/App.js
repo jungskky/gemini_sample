@@ -8,6 +8,7 @@ function App() {
   
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isWaiting, setIsWaiting] = useState(false); // API 요청 후 첫 응답을 기다리는 상태
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
 
@@ -20,7 +21,7 @@ function App() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, isStreaming]);
+  }, [messages, isStreaming, isWaiting]);
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -30,21 +31,21 @@ function App() {
   }, [input]);
 
   const createNewChat = () => {
-    if (!isStreaming) {
+    if (!isStreaming && !isWaiting) {
       setCurrentChatId(null);
       setInput('');
     }
   };
 
   const selectChat = (id) => {
-    if (!isStreaming) {
+    if (!isStreaming && !isWaiting) {
       setCurrentChatId(id);
       setInput('');
     }
   };
 
   const sendMessage = async () => {
-    if (!input.trim() || isStreaming) return;
+    if (!input.trim() || isStreaming || isWaiting) return;
 
     const currentInput = input;
     let targetChatId = currentChatId;
@@ -77,6 +78,7 @@ function App() {
     setChats(updatedChats);
     setInput('');
     setIsStreaming(true);
+    setIsWaiting(true); // 요청 시작 시 대기 상태 활성화
 
     try {
       const response = await fetch('http://localhost:8000/chat/stream', {
@@ -94,6 +96,9 @@ function App() {
         done = readerDone;
 
         if (value) {
+          // 첫 응답 조각을 받으면 대기 상태 해제
+          if (isWaiting) setIsWaiting(false);
+          
           const chunk = decoder.decode(value, { stream: true });
           setChats(prev => {
             const newChats = [...prev];
@@ -113,6 +118,7 @@ function App() {
       console.error("API Error:", error);
     } finally {
       setIsStreaming(false);
+      setIsWaiting(false);
     }
   };
 
@@ -123,7 +129,18 @@ function App() {
     }
   };
 
-  const renderMessageContent = (content) => {
+  const renderMessageContent = (content, isCurrentMessageWaiting) => {
+    // 응답 내용이 비어있고 대기 중일 때 로딩 애니메이션 표시
+    if (!content && isCurrentMessageWaiting) {
+      return (
+        <div className="loading-dots">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      );
+    }
+
     const thinkMatch = content.match(/<think>([\s\S]*?)(?:<\/think>|$)/);
     const hasThink = !!thinkMatch;
     
@@ -201,7 +218,7 @@ function App() {
                   </div>
                   <div className="text-content">
                     {msg.role === 'assistant' ? (
-                      renderMessageContent(msg.content)
+                      renderMessageContent(msg.content, isWaiting && idx === messages.length - 1)
                     ) : (
                       <div style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>
                     )}
@@ -221,13 +238,13 @@ function App() {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="메시지를 입력하세요..."
-              disabled={isStreaming}
+              disabled={isStreaming || isWaiting}
               rows={1}
             />
             <button 
               className="send-button" 
               onClick={sendMessage} 
-              disabled={isStreaming || !input.trim()}
+              disabled={isStreaming || isWaiting || !input.trim()}
             >
               <svg className="send-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>

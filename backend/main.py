@@ -6,7 +6,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Optional
 
-GOOGLE_API_KEY = "AIzaSyClpxKgMkrDo0RgkkVnh-6Dbi-ZWUapdZA"
+GOOGLE_API_KEY = "AIzaSyBf6W5J2Za0Occv2PLrml9S5z2HLl3AxxQ"
 
 client = AsyncOpenAI(
     api_key=GOOGLE_API_KEY,
@@ -43,7 +43,7 @@ async def get_gemini_response(user_input: str, history: List[Message]):
         messages.append({"role": "user", "content": user_input})
 
         response = await client.chat.completions.create(
-            model="gemini-1.5-pro",
+            model="gemini-2.5-pro",
             messages=messages,
             stream=True
         )
